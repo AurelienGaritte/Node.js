@@ -6,10 +6,10 @@ Un bot Discord pour recevoir automatiquement les dernières news boursières, r�
 
 ## 🎯 Objectifs
 
-- Publier automatiquement des news via l'API [Marketaux](https://www.marketaux.com/).
-- Réagir à des messages utilisateurs pour chercher des news personnalisées.
-- Envoyer des messages de bienvenue et de clôture aux horaires définis.
-- Nettoyer les salons via une commande personnalisée `!clear`.
+- Publier automatiquement des news via l'API [Marketaux](https://www.marketaux.com/). ✅
+- Réagir à des messages utilisateurs pour chercher des news personnalisées. ❌
+- Envoyer des messages de bienvenue et de clôture aux horaires définis. ✅
+- Nettoyer les salons via une commande personnalisée `!clear`. ✅
 
 ---
 
