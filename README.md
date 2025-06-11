@@ -53,3 +53,17 @@ BotDiscord/
 ├── .env               # Clés API et ID du salon Discord
 ├── package.json       # Dépendances
 └── README.md          # Ce fichier
+
+```
+
+## ➡️ Rendu
+
+### 💻 En console
+
+![Console](./images/Console.png)
+
+### 🔊 Sur Discord
+
+![Discord](./images/Discord.png)
+
+
