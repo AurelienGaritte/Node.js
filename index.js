@@ -1,5 +1,6 @@
 const { Client, GatewayIntentBits, Partials, PermissionsBitField } = require('discord.js');
 const axios = require('axios');
+const cron = require('node-cron');
 require('dotenv').config();
 
 const client = new Client({
@@ -11,67 +12,95 @@ const client = new Client({
   partials: [Partials.Channel]
 });
 
+// ✅ Mots-clés personnalisés
+const motsCles = `"Orange SA" OR ORA OR 
+"Consol Energy" OR CEIX OR 
+"Mo-Bruk SA" OR MBR.WA OR 
+"Nak Sealing Technologies Corp" OR 9942.TW OR 
+"Mastercard Inc" OR MA OR 
+"Visa Inc" OR V OR 
+"ASML Holding NV" OR ASML OR 
+"S&P 500" OR "S&P500" OR SP500 OR SPY OR 
+"USDA" OR 
+"Rana Gruber" OR RANA.OL OR 
+"XETRA-GOLD" OR "4GLD" OR 
+"TSMC" OR 
+"Zengame Technology" OR 
+"Hemisphere Energy" OR HME OR 
+"Interactive Brokers" OR IBKR`;
+
+// 🧠 Mémoire des sujets du jour
+let sujetsDuJour = new Set();
+
 client.once('ready', () => {
   console.log(`📈 Bot boursier connecté en tant que ${client.user.tag}`);
 
-  // Lancer la première récupération
+  // 🔁 Envoi immédiat au lancement
   postMarketNews();
 
-  // Puis toutes les heures
-  setInterval(postMarketNews, 1000 * 60 * 60);
+  // ⏰ Envoi aux heures fixes : 10h, 14h, 18h
+  cron.schedule('0 10,14,18 * * *', () => {
+    console.log("🕒 Déclenchement d'une recherche de news");
+    postMarketNews();
+  });
+
+  // 📅 Récap à 18h02
+  cron.schedule('2 18 * * *', () => {
+    sendDailyRecap();
+  });
 });
 
 async function postMarketNews() {
   try {
-    // Mots-clés optimisés
-    const motsCles = `"Orange SA" OR "Hemisphere Energy" OR "Cardano" OR "ETH" OR "Ethereum" OR "Interactive Brokers" OR ORA OR HME OR TFI OR IBKR`;
-
-    // News FR + EN
-    const urls = [
-      {
-        lang: 'fr',
-        url: `https://newsapi.org/v2/everything?q=${encodeURIComponent(motsCles)}&language=fr&sortBy=publishedAt&apiKey=${process.env.NEWSAPI_KEY}`
-      },
-      {
-        lang: 'en',
-        url: `https://newsapi.org/v2/everything?q=${encodeURIComponent(motsCles)}&language=en&sortBy=publishedAt&apiKey=${process.env.NEWSAPI_KEY}`
-      }
-    ];
+    const query = encodeURIComponent(motsCles);
+    const url = `https://api.marketaux.com/v1/news/all?language=fr,en&api_token=${process.env.MARKETAUX_KEY}&q=${query}`;
+    const res = await axios.get(url);
+    const articles = res.data.data.slice(0, 5);
 
     const channel = await client.channels.fetch(process.env.CHANNEL_ID);
-    let totalArticles = 0;
 
-    for (const source of urls) {
-      const res = await axios.get(source.url);
-      const articles = res.data.articles.slice(0, 2);
-
-      if (articles.length === 0) {
-        await channel.send(`🔍 Aucune actualité trouvée en ${source.lang === 'fr' ? 'français' : 'anglais'}.`);
-        continue;
-      }
-
-      for (const article of articles) {
-        const langue = source.lang === 'fr' ? '🇫🇷 Français' : '🇬🇧 Anglais';
-        await channel.send(`📰 **${article.title}**\n🗣️ Langue : ${langue}\n🔗 ${article.url}`);
-        totalArticles++;
-      }
+    if (articles.length === 0) {
+      await channel.send("😴 Aucune actualité trouvée via Marketaux.");
+      return;
     }
 
-    if (totalArticles === 0) {
-      await channel.send("😴 Aucune actualité récente trouvée pour les sociétés surveillées.");
+    for (const article of articles) {
+      const lang = article.language === 'fr' ? '🇫🇷 Français' : '🇬🇧 Anglais';
+      const title = article.title || '[Sans titre]';
+      const summary = article.description || '';
+      const topic = article.entities?.[0]?.name || 'un sujet suivi';
+      const source = article.source || 'source inconnue';
+
+      // Ajout à la mémoire du jour
+      if (topic) sujetsDuJour.add(topic);
+
+      await channel.send(`🧠 Nouvelle news sur **${topic}** !\n🗣️ Langue : ${lang}\n**${title}**\n${summary}\n🔗 ${article.url}`);
     }
 
   } catch (err) {
-    console.error("❌ Erreur dans la récupération des news :", err);
+    console.error("❌ Erreur Marketaux :", err.message || err);
   }
 }
 
-// 💬 Commande texte : !clear 10
+async function sendDailyRecap() {
+  const channel = await client.channels.fetch(process.env.CHANNEL_ID);
+
+  if (sujetsDuJour.size === 0) {
+    await channel.send("📅 Aucun sujet mentionné aujourd’hui. Journée calme 💤");
+  } else {
+    const sujets = Array.from(sujetsDuJour).join(', ');
+    await channel.send(`📊 **Récap des sujets abordés aujourd’hui :**\n🧠 ${sujets}`);
+  }
+
+  // Réinitialiser la mémoire
+  sujetsDuJour.clear();
+}
+
+// 🧽 Commande !clear <nombre>
 client.on('messageCreate', async message => {
   if (message.author.bot) return;
 
   if (message.content.startsWith('!clear')) {
-    // Vérifie la permission
     if (!message.member.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
       return message.reply("🚫 Tu n'as pas la permission de faire ça.");
     }
