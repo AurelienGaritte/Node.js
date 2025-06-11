@@ -21,6 +21,16 @@ const motsClesArray = [...new Set(
     .filter((el) => el.length > 1)
 )];
 
+const sendDailyGreeting = async () => {
+  const channel = await client.channels.fetch(process.env.CHANNEL_ID);
+  await channel.send("🌞 Salut trader en herbe, prêt pour une nouvelle journée enrichissante ? 💸📈");
+};
+
+const sendEveningMessage = async () => {
+  const channel = await client.channels.fetch(process.env.CHANNEL_ID);
+  await channel.send("🌙 Bonne soirée, reposez-vous bien, l'aventure continue ! 😴📊");
+};
+
 const getMarketNews = async () => {
   try {
     const response = await axios.get("https://api.marketaux.com/v1/news/all", {
@@ -92,13 +102,22 @@ client.on("messageCreate", async (message) => {
   }
 });
 
-client.once("ready", () => {
+client.once("ready", async () => {
   console.log("🤖 Bot en ligne et prêt !");
+  await sendDailyGreeting();
   postMarketNews();
 
-  cron.schedule("0 10 * * *", postMarketNews);
+  cron.schedule("0 10 * * *", async () => {
+    await sendDailyGreeting();
+    await postMarketNews();
+  });
+
   cron.schedule("0 14 * * *", postMarketNews);
-  cron.schedule("0 18 * * *", postMarketNews);
+
+  cron.schedule("0 18 * * *", async () => {
+    await postMarketNews();
+    await sendEveningMessage();
+  });
 });
 
 client.login(process.env.TOKEN);
